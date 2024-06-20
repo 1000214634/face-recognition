@@ -1,35 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Jun 18 10:56:39 2024
-
-@author: Ahmed
-"""
-import nest_asyncio
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
+import streamlit as st
 import cv2
 import numpy as np
 import face_recognition
-import os
 from datetime import datetime
-import io
+import os
+import concurrent.futures
 
-nest_asyncio.apply()
-app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello, World!"}
-
-# تحميل مجموعة البيانات والعثور على الترميزات
-path = r'C:\Users\HP 2021\Desktop\gr_proj\streamlit\dataset'
-images = []
-classNames = []
-myList = os.listdir(path)
-for cl in myList:
-    curImg = cv2.imread(f'{path}/{cl}')
-    images.append(curImg)
-    classNames.append(os.path.splitext(cl)[0])
 
 def findEncodings(images):
     encodeList = []
@@ -39,30 +15,94 @@ def findEncodings(images):
         encodeList.append(encode)
     return encodeList
 
-encodeListKnown = findEncodings(images)
-print('Encoding Complete')
 
-@app.post('/recognize')
-async def recognize(file: UploadFile = File(...)):
-    image = await file.read()
-    img = face_recognition.load_image_file(io.BytesIO(image))
-    imgS = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    facesCurFrame = face_recognition.face_locations(imgS)
-    encodesCurFrame = face_recognition.face_encodings(imgS, facesCurFrame)   
+def markAttendance(name):
+    with open(r"C:\Users\HP 2021\Desktop\gr_proj\Attendance.csv", 'r+') as f:
+        myDataList = f.readlines()
+        nameList = []
+        for line in myDataList:
+            entry = line.split(',')
+            nameList.append(entry[0])
+        if name not in nameList:
+            now = datetime.now()
+            dtString = now.strftime('%H:%M:%S')
+            f.writelines(f'\n{name},{dtString}')
+            
+            
+            
+            
+def main():
+    st.title("Face Recognition App")
+    st.write("Click the button below to start face recognition:")
+    
+    if st.button("Start Recognition"):
+       path = r'C:\Users\HP 2021\Desktop\gr_proj\streamlit\dataset'
+       images = []
+       classNames = []
+       myList = os.listdir(path)
+       
+       
+       for cl in myList:
+           curImg = cv2.imread(f'{path}/{cl}')
+           images.append(curImg)
+           classNames.append(os.path.splitext(cl)[0])
 
-    for encodeFace, faceLoc in zip(encodesCurFrame, facesCurFrame):
-        matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
-        faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
-        matchIndex = np.argmin(faceDis)
-        
-        if matches[matchIndex]:
-            name = classNames[matchIndex].upper()
-            return JSONResponse(content={"name": name})
-        
-    return JSONResponse(content={"name": "not found"})
+       encodeListKnown = findEncodings(images)
+       print('Encoding Complete')
+       
+       
+       cap = cv2.VideoCapture(0)
+       frame_resizing = 0.25
+       
 
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="192.168.1.62", port=8000)  # استخدم عنوان IP الفعلي الخاص بك
+       
+       while True:
+           success, img = cap.read()
+           imgS = cv2.resize(img, (0, 0), fx=frame_resizing, fy=frame_resizing)
+           imgS = cv2.cvtColor(imgS, cv2.COLOR_BGR2RGB)
 
+           facesCurFrame = face_recognition.face_locations(imgS)
+           encodesCurFrame = face_recognition.face_encodings(imgS, facesCurFrame)
+           
+           
+           
+           for encodeFace, faceLoc in zip(encodesCurFrame, facesCurFrame):
+              matches = face_recognition.compare_faces(encodeListKnown, encodeFace)
+              faceDis = face_recognition.face_distance(encodeListKnown, encodeFace)
+              matchIndex = np.argmin(faceDis)
+              if matches[matchIndex]:
+                  name = classNames[matchIndex].upper()
+                  markAttendance(name)
+                  
+                  
+if __name__ == "__main__":
+    main()
+       
+       
+       
+       
 
+       
+       
+       
+       
+       
+       
+       
+    
+    
+    
+
+  
+      
+
+              
+              
+              
+    
+    
+    
+    
+    
+    
+    
